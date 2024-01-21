@@ -180,8 +180,8 @@ namespace Site.Controllers
             if(cl == null){
                 return StatusCode(502);
             }
-            return Json(new AccountInfo() { name = cl.name, balance = cl.balance });
-        }
+            return Json(new AccountInfo() { name = cl.name, balance = cl.balance, uuid = cl.uuid}) ;
+        }   
 
         [HttpGet]
         [Route("[controller]/account/login/{code}")]
