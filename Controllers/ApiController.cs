@@ -10,6 +10,8 @@ using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Site.Controllers
 {
@@ -59,17 +61,13 @@ namespace Site.Controllers
         [HttpGet]
         [Route("[controller]/transaction/get/{token}")]
         public ActionResult GetTransaction(string token)
-        { 
-            if (data.admins.Any(x => x.token == Request.Headers["Admin"].ToString()))
+        {
+            var a = data.accounts.Include(x => x.transactions_output).Include(x => x.transactions_output).FirstOrDefault(x => x.token == token);
+            if (a.transactions_output == null && a.transactions_input == null)
             {
-                var a = data.accounts.Include(x => x.transactions_output).Include(x => x.transactions_output).FirstOrDefault(x => x.token == token);
-                if(a.transactions_output == null && a.transactions_input == null)
-                {
-                    return null;
-                }
-                return Json(new TransacrionAll() { input = a.transactions_input, output = a.transactions_output });
+                return StatusCode(504);
             }
-            return Unauthorized();
+            return Json(new TransacrionAll() { input = a.transactions_input, output = a.transactions_output });
         }
 
         [HttpPost]
@@ -181,11 +179,37 @@ namespace Site.Controllers
                 return StatusCode(502);
             }
             return Json(new AccountInfo() { name = cl.name, balance = cl.balance, uuid = cl.uuid}) ;
-        }   
+        }
+        [HttpPost]
+        [Route("[controller]/admin/token")]
+        public IActionResult AdminToken([FromBody]AdminForm ad)
+        {
+            MD5 md5 = MD5.Create();
+            string hash = Convert.ToBase64String(md5.ComputeHash(Encoding.UTF8.GetBytes(ad.password + ":" + ad.login)));
+            var res = data.admins.FirstOrDefault(x => x.token == hash);
+            if(res != null)
+            {
+                return Json(res);
+            }
+            return BadRequest("Not fined");
+            
+            }
+
+        [HttpGet]
+        [Route("[controller]/admin/login")]
+        public IActionResult AdminLogin()
+        {
+            var res = data.admins.FirstOrDefault(x => x.token == Request.Headers["Admin"].ToString());
+            if (res != null)
+            {
+                return Json(res.id);
+            }
+            return BadRequest();
+        }
 
         [HttpGet]
         [Route("[controller]/account/login/{code}")]
-        public IActionResult login(string code)
+        public async Task<IActionResult> login(string code)
         {
             string token = string.Empty;
             try
@@ -200,8 +224,9 @@ namespace Site.Controllers
                     if (!data.accounts.Any(x => x.token == token))
                     {
                         var id = Discord.GetId(token);
-                        data.accounts.Add(new accounts { name = sp.GetUser(id), discordid = id, token = token, balance = 0 });
-                        data.SaveChanges();
+                        var name = await sp.GetUserAsync(id);
+                        data.accounts.Add(new accounts { name = name, discordid = id, token = token, uuid = await sp.GetMojangUuidAsync(name), balance = 0 });
+                        await data.SaveChangesAsync();
                     }
                 }
             }
