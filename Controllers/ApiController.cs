@@ -57,6 +57,16 @@ namespace Site.Controllers
             catch(Exception ex) { return Unauthorized(); }
         }
 
+        [HttpGet]
+        [Route("[controller]/admin/transaction/get/{token}")]
+        public IActionResult LoadTransactionsAdmin()
+        {
+            if (data.admins.Any(x => x.token == Request.Headers["Admin"].ToString()))
+            {
+                return Json(data.transactions_output.Where(x => x.status == 2));
+            }
+            return Unauthorized();
+        }
 
         [HttpGet]
         [Route("[controller]/transaction/get/{token}")]
@@ -71,7 +81,7 @@ namespace Site.Controllers
         }
 
         [HttpPost]
-        [Route("[controller]/transaction/accept")]
+        [Route("[controller]/admin/transaction/accept")]
         public async Task<IActionResult> AcceptTransaction([FromBody] AcceptDeleteTransaction transaction)
         {
             if (data.admins.Any(x => x.token == Request.Headers["Admin"].ToString()))
@@ -114,7 +124,7 @@ namespace Site.Controllers
             return Unauthorized();
         }
         [HttpPost]
-        [Route("[controller]/transaction/search")]
+        [Route("[controller]/admin/transaction/search")]
         public IActionResult SearchTransaction([FromBody] SearchOrDeleteTransaction tr)
         {
             if (data.admins.Any(x => x.token == Request.Headers["Admin"].ToString()))
@@ -140,7 +150,7 @@ namespace Site.Controllers
             return Unauthorized();
         }
         [HttpPost]
-        [Route("[controller]/transaction/decline")]
+        [Route("[controller]/admin/transaction/decline")]
         public async Task<IActionResult> DeclineTransaction([FromBody] DeclineTransaction tr)
         {
             if (data.admins.Any(x => x.token == Request.Headers["Admin"].ToString()))
@@ -185,24 +195,25 @@ namespace Site.Controllers
         public IActionResult AdminToken([FromBody]AdminForm ad)
         {
             MD5 md5 = MD5.Create();
-            string hash = Convert.ToBase64String(md5.ComputeHash(Encoding.UTF8.GetBytes(ad.password + ":" + ad.login)));
-            var res = data.admins.FirstOrDefault(x => x.token == hash);
-            if(res != null)
+            string hash = Convert.ToBase64String(md5.ComputeHash(Encoding.UTF8.GetBytes(ad.password)));
+            var res = data.admins.FirstOrDefault(x => x.login == ad.login);
+            if(res != null && res.token == hash)
             {
                 return Json(res);
             }
             return BadRequest("Not fined");
-            
-            }
+        
+        }
 
         [HttpGet]
         [Route("[controller]/admin/login")]
         public IActionResult AdminLogin()
         {
-            var res = data.admins.FirstOrDefault(x => x.token == Request.Headers["Admin"].ToString());
+            var tk = Request.Headers["Admin"].ToString();
+            var res = data.admins.FirstOrDefault(x => x.token == tk);
             if (res != null)
             {
-                return Json(res.id);
+                return Json(res);
             }
             return BadRequest();
         }
