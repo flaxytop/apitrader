@@ -12,7 +12,7 @@ namespace ApiTrader.DbClasses
         public string time { get; set; }
         public bool isread { get; set; }
         public int status { get; set; }
-        public string comment { get; set; }
+        public string comment { get; set; } = null!;
 
         [JsonIgnore]
         public accounts accounts { get; set; } = null!;

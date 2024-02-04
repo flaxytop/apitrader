@@ -12,6 +12,8 @@ using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Extensions.Primitives;
+using System.Text.Json;
 
 namespace Site.Controllers
 {
@@ -112,7 +114,7 @@ namespace Site.Controllers
                 }
                 if (transaction.amount <= account.balance)
                 {
-                    var b = new transactions_output() { discordid = account.discordid, amount = transaction.amount, name = account.name, time = DateTime.UtcNow.ToString(), status = 2, comment = "null", isread = false };
+                    var b = new transactions_output() { discordid = account.discordid, amount = transaction.amount, name = account.name, time = DateTime.UtcNow.ToString()};
                     account.transactions_output.Add(b);
                     account.balance -= transaction.amount;
                     data.accounts.Update(account);
@@ -237,6 +239,7 @@ namespace Site.Controllers
                         var id = Discord.GetId(token);
                         var name = await sp.GetUserAsync(id);
                         data.accounts.Add(new accounts { name = name, discordid = id, token = token, uuid = await sp.GetMojangUuidAsync(name), balance = 0 });
+                        data.accounts_stock.Add(new accounts_stock { discordid = id });
                         await data.SaveChangesAsync();
                     }
                 }
@@ -247,7 +250,49 @@ namespace Site.Controllers
             }
             return Ok(Json(new Token() { token = token }));
         }
+
+
+
+
+
+        // -----STOCKS-------
+        [HttpPost]
+        [Route("[controller]/stock/buy")]
+        public async Task<IActionResult> BuyStock([FromBody]BuyStock stock)
+        {
+            var th_stock = data.stocks.FirstOrDefault(x => x.id == stock.stock_id);
+            if (Request.Headers["User"] != StringValues.Empty)
+            {
+                var account = data.accounts.Include(x => x.accounts_stock).FirstOrDefault(x => x.token == Request.Headers["User"].ToString());
+                if(account !=  null)
+                {
+                    
+                    if(th_stock != null)
+                    {
+                        var js = account.accounts_stock.stocks_json != null ? JsonNode.Parse(account.accounts_stock.stocks_json) : null;
+                        if (js != null && js[$"{th_stock.id}"] != null)
+                        {
+                            js[$"{th_stock.id}"] = (int.Parse(js[$"{th_stock.id}"].ToString()) + stock.amount).ToString();
+                        } else {
+                            js += "{" + $"\"{stock.stock_id}\":\"{stock.amount}\"" + "}";
+                        }
+                        account.accounts_stock.stocks_json = js.ToString();
+                        account.balance -= th_stock.price * th_stock.coefficient * stock.amount;
+                        account.accounts_stock.stocks_buy.Add(new stocks_buy() { stock_price_withcoef = th_stock.price * th_stock.coefficient, date = DateTime.UtcNow.ToString(), stock_id = stock.stock_id, stock_amount = stock.amount });
+
+                        await data.SaveChangesAsync();
+                        return Ok();
+                    }
+                }
+            }
+            return BadRequest();
+        }
     }
+
+
+
+
+
 
 
 
