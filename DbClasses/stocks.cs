@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 namespace ApiTrader.DbClasses
 {
@@ -11,6 +12,10 @@ namespace ApiTrader.DbClasses
         public string? token { get; set; } = null!;
         public string? description { get; set; } = null!;
         public string discordid { get; set; }
+
+        [Column(TypeName = "jsonb")]
+        public string? history { get; set; }
+        public string? created_at { get; set; }
         public byte[]? icon { get; set; } = null!;
 
         [JsonIgnore]

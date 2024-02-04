@@ -31,6 +31,7 @@ namespace ApiTrader.OtherClasses
             modelBuilder.Entity<transactions_input>().HasKey(x => new { x.id });
             modelBuilder.Entity<stocks>().HasKey(x => new {x.id});
             modelBuilder.Entity<accounts_stock>().HasKey(x => new { x.discordid });
+            modelBuilder.Entity<stocks_buy>().HasKey(x => new { x.id });
         }
     }
 }   
