@@ -73,13 +73,17 @@ namespace Site.Controllers
 
         [HttpGet]
         [Route("[controller]/transaction/get/{token}")]
-        public ActionResult GetTransaction(string token)
+        public ActionResult GetTransactions(string token, int timezone)
         {
             var a = data.accounts.Include(x => x.transactions_output).Include(x => x.transactions_output).FirstOrDefault(x => x.token == token);
             if (a.transactions_output == null && a.transactions_input == null)
             {
                 return StatusCode(504);
             }
+            a.transactions_output.ForEach(x => {
+                x.time = DateTime.Parse(x.time).AddHours(timezone).ToString();
+            });
+            a.transactions_input.ForEach(x => x.time.AddHours(timezone));
             return Json(new TransacrionAll() { input = a.transactions_input, output = a.transactions_output });
         }
 
@@ -104,7 +108,7 @@ namespace Site.Controllers
 
         [HttpPost]
         [Route("[controller]/transaction/create")]
-        public async Task<IActionResult> CreateTransaction([FromBody] CreateTransaction transaction)
+        public async Task<IActionResult> CreateTransaction([FromBody] CreateTransaction transaction, int timezone)
         {
             if (Request.Headers["User"] != string.Empty)
             {
@@ -115,11 +119,13 @@ namespace Site.Controllers
                 }
                 if (transaction.amount <= account.balance)
                 {
-                    var b = new transactions_output() { discordid = account.discordid, amount = transaction.amount, name = account.name, time = DateTime.UtcNow.ToString()};
+                    var date = DateTime.UtcNow;
+                    var b = new transactions_output() { discordid = account.discordid, amount = transaction.amount, name = account.name, time = date.ToString(), status = 2};
                     account.transactions_output.Add(b);
                     account.balance -= transaction.amount;
                     data.accounts.Update(account);
                     await data.SaveChangesAsync();
+                    b.time = date.AddHours(timezone).ToString();
                     return Json(b);
                 }
                 return BadRequest();

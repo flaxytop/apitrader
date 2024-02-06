@@ -13,5 +13,6 @@ namespace ApiTrader.DbClasses
 
         [JsonIgnore]
         public accounts accounts { get; set; } = null!;
+        
     }
 }
