@@ -1,5 +1,6 @@
 ﻿
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace ApiTrader.DbClasses
 {
@@ -11,8 +12,10 @@ namespace ApiTrader.DbClasses
         public float balance { get; set; }
         public string uuid { get; set; }
 
+        
         public List<transactions_input> transactions_input { get; set; } = [];
         public List<transactions_output> transactions_output { get; set; } = [];
-        public accounts_stock accounts_stock { get; set; } = null!;
+        public accounts_stock accounts_stock { get; set; }
+        public accounts_tpay accounts_tpay { get; set; }
     }
 }

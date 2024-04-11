@@ -15,6 +15,7 @@ using System.Text;
 using Microsoft.Extensions.Primitives;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore.ValueGeneration;
+using ApiTrader.Function;
 
 namespace Site.Controllers
 {
@@ -25,11 +26,13 @@ namespace Site.Controllers
     {
         private readonly DataContext data;
         private readonly SpWorlds sp;
-        
+        private readonly TPayBD TPay;
+
         public apiController(DataContext _data, SpWorlds _sp)
         {
             data = _data;
             sp = _sp;
+            TPay = new TPayBD(data);
         }
 
         [HttpPost]
@@ -61,7 +64,7 @@ namespace Site.Controllers
         }
 
         [HttpGet]
-        [Route("[controller]/admin/transaction/get/{token}")]
+        [Route("[controller]/admin/transaction/get")]
         public IActionResult LoadTransactionsAdmin()
         {
             if (data.admins.Any(x => x.token == Request.Headers["Admin"].ToString()))
@@ -237,16 +240,22 @@ namespace Site.Controllers
                 if (code != null)
                 {
                     token = Discord.GetToken(code);
+                    string id = Discord.GetId(token);
                     if(token == null)
                     {
                         return Unauthorized();
                     }
-                    if (!data.accounts.Any(x => x.token == token))
+                    var tmp = data.accounts.FirstOrDefault(x => x.discordid == id);
+                    if (tmp == null)
                     {
-                        var id = Discord.GetId(token);
                         var name = await sp.GetUserAsync(id);
                         data.accounts.Add(new accounts { name = name, discordid = id, token = token, uuid = await sp.GetMojangUuidAsync(name), balance = 0 });
                         data.accounts_stock.Add(new accounts_stock { discordid = id });
+                        await data.SaveChangesAsync();
+                    }
+                    else if (tmp.token != token) {
+                        tmp.token = token;
+                        data.accounts.Update(tmp);
                         await data.SaveChangesAsync();
                     }
                 }
@@ -298,6 +307,68 @@ namespace Site.Controllers
         }
 
 
+        [Route("[controller]/tpay/card/{name}")]
+        [HttpPost]
+        public async Task<IActionResult> CreateCard(string name)
+        {
+            if (await TPay.CreateNewCard(Request.Headers["User"].ToString(), name))
+            {
+                return Ok();
+            }
+            return BadRequest();
+        }
+
+        [Route("[controller]/tpay/card/{card_id}")]
+        [HttpGet]
+        public async Task<IActionResult> GetCard(int card_id)
+        {
+            return Json(await TPay.GetCard(Request.Headers["User"].ToString(), card_id));
+        }
+
+        [Route("[controller]/tpay/cards")]
+        [HttpGet]
+        public async Task<IActionResult> GetCards()
+        {
+            return Json(await TPay.GetCards(Request.Headers["User"].ToString()));
+        }
+        [Route("[controller]/tpay/card/{card_id}")]
+        [HttpDelete]
+        public async Task<IActionResult> DeleteCard(int card_id)
+        {
+            return (await TPay.DeleteCard(Request.Headers["User"].ToString(), card_id)) ? Ok() : BadRequest(); 
+        }
+
+        [Route("[controller]/tpay/account")]
+        [HttpGet]
+        public async Task<IActionResult> GetTpayAccount()
+        {
+            return Json(await TPay.GetAccount(Request.Headers["User"].ToString()));
+        }
+
+        [Route("[controller]/tpay/transaction")]
+        [HttpPost]
+        public async Task<IActionResult> CreateTransactionTpay([FromBody] CreateTransactionTPay tr)
+        {
+            if(await TPay.CreateTransaction(Request.Headers["User"].ToString(), tr.amount, tr.card_id, comment: tr.comment, to_card_id: tr.to_card_id, to: tr.to))
+            {
+                if (tr.to.Contains("spworlds"))
+                {
+                   var reciver = tr.to.Substring(tr.to.IndexOf(':') + 1);
+                   sp.SendPayment(tr.amount, reciver, $"TRADER (TPay). From {tr.card_id}.");
+                   TPay.SetBalance(tr.card_id, tr.amount * -1);
+                }
+                else if (tr.to.Contains("trader")){
+                    TPay.SetBalance(tr.card_id, tr.amount);
+                }
+                else
+                {
+                    TPay.SetBalance(tr.to_card_id, tr.amount);
+                    TPay.SetBalance(tr.card_id, tr.amount * -1);
+                }
+                return Ok();
+            }
+            return BadRequest();
+        }
     }
 
 
